@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+    <title>XDU ACIS|Admin-Panel</title>
+</head>
+
+<body>
+    <div id="container" class="container-fluid" style="padding:0;">
+        <div id="header" class="d-flex flex-column align-items-center justify-content-center bg-light w-100" style="padding:2rem;">
+            <h3>XDU<span class="text-primary">|</span>疫情通自动打卡</h3>
+            <h4 class="text-primary">管理系统</h4>
+        </div>
+        <!-- Nav tabs -->
+        <div id="nav" v-bind:style="{display:stat?'':'none'}">
+            <ul class="nav nav-pills justify-content-center" style="padding:1rem;">
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="pill" href="#glance">概览</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" data-toggle="pill" href="#auth">授权</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-toggle="pill" href="#control" @click="get_service_log()">控制</a>
+                </li>
+            </ul>
+        </div>
+        <div id="main" class="d-flex flex-column align-items-center tab-content" style="padding:2rem;min-height:60vh;">
+            <div class="tab-pane" id="glance" style="width:100%;max-width:768px;" v-bind:style="{display:stat?'':'none'}">
+                <h4>数据</h4>
+                <p>用户总数：{{glance_data.enabled + glance_data.disabled}}</p>
+                <p>启用打卡人数：{{glance_data.enabled}}</p>
+                <p>关闭打卡人数：{{glance_data.disabled}}</p>
+                <br />
+                <h4>打卡信息</h4>
+                <p>当日打卡次数：{{glance_data.check_in_count}}次</p>
+            </div>
+            <div class="tab-pane active" id="auth" style="width:100%;max-width:768px;" v-bind:style="{display:stat?'':'none'}">
+                <h4>授权码管理</h4>
+                <div class="alert alert-success alert-dismissible fade show">
+                    <button type="button" class="close" data-dismiss="alert">&times;</button>
+                    <strong>摸鱼：</strong>做完了，能用。不过别点太快，会删库的
+                </div>
+                <button class="btn btn-primary" @click="gen_auth_code()">生成</button>
+                <p>总数量：{{auth_data.available+auth_data.unavailable}}</p>
+                <p>已使用：{{auth_data.unavailable}}</p>
+                <p>剩余：{{auth_data.available}}</p>
+                <template v-for="item in auth_data.auth_code">
+                    <p>
+                        <span class="text-primary">授权码：</span>{{item.code}}<br>
+                        <span class="text-primary">用户：</span>{{item.user==null?'无':item.user}}
+                    </p>
+                </template>
+            </div>
+            <div class="tab-pane" id="control" style="width:100%;max-width:768px;" v-bind:style="{display:stat?'':'none'}">
+                <h4>打卡服务总开关</h4>
+                <p>状态：<span v-bind:class="{'text-danger':!service_stat,'text-success':service_stat}">{{service_stat?'已开启':'已关闭'}}</span></p>
+                <button class="btn btn-primary" @click="switch_service_stat()">切换</button>
+                <br/><br/>
+                <h4>手动打卡</h4>
+                <button class="btn btn-primary" onclick="window.location.href='core.php?admin=check_in'">打卡</button>
+                <br/><br/>
+                <h4>退出管理员账户</h4>
+                <button class="btn btn-primary" @click="logout()">登出</button>
+                <br><br/>
+                <h4>系统日志</h4>
+                <template v-for="item in service_log">
+                <p>
+                    <span class="text-primary">[{{item.date}}]</span><br>
+                    <span>{{item.content}}</span>
+                </p>
+                </template>
+            </div>
+            <div id="login" style="width:100%;max-width:768px;" v-bind:style="{display:stat?'none':''}">
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" v-model="pw" name="pw" class="form-control" placeholder="登录管理系统">
+                </div>
+                <button class="btn btn-primary" @click="login(pw)">登录</button>
+            </div>
+        </div>
+        <div id="footer" class="d-flex flex-column align-items-center justify-content-center bg-light" style="padding:2rem;">
+            <p>已运行：<span id="time_year"></span>年<span id="time_day"></span>日<span id="time_hour"></span>时<span id="time_minute"></span>分<span id="time_second"></span>秒</p>
+            <p>&copy; 2021 | xeonds</p>
+        </div>
+    </div>
+    <script src="assets/js/run_time.js"></script>
+    <script src="assets/js/jquery.min.js"></script>
+    <script src="assets/js/axios.min.js"></script>
+    <script src="assets/js/bootstrap.js"></script>
+    <script src="assets/js/vue.js"></script>
+    <script>
+        site_run_time(2021, 11, 3, 0, 0, 0);
+        new Vue({
+            el: "#container",
+            data: {
+                pw: '',
+                stat: false,
+                service_stat: false,
+                service_log: [],
+                glance_data: [],
+                auth_data: []
+            },
+            created: function() {
+                that = this;
+
+                that.get_login_stat();
+                window.setInterval(function() {
+                    if (that.stat) {
+                        that.get_service_stat();
+                        that.glance();
+                        that.auth();
+                    }
+                }, 1000);
+            },
+            methods: {
+                login: function(pw) {
+                    that = this;
+                    let data = new FormData();
+
+                    data.append('pw', pw);
+                    axios.post('core.php?admin=login', data)
+                        .then(function(res) {
+                            that.stat = res.data.stat;
+                        });
+                    that.get_login_stat();
+                },
+                logout: function() {
+                    that = this;
+
+                    axios.get('core.php?admin=logout')
+                        .then(function(res) {
+                            that.stat = res.data.stat;
+                        });
+                    that.get_login_stat();
+                },
+                get_login_stat: function() {
+                    that = this;
+                    axios.get('core.php?admin=get_stat')
+                        .then(function(res) {
+                            that.stat = res.data.stat;
+                        });
+                },
+                glance: function() {
+                    that = this;
+                    axios.get('core.php?admin=glance')
+                        .then(function(res) {
+                            that.glance_data = res.data;
+                        });
+                },
+                auth: function() {
+                    that = this;
+                    axios.get('core.php?admin=auth')
+                        .then(function(res) {
+                            that.auth_data = res.data;
+                        });
+                },
+                gen_auth_code: function() {
+                    that = this;
+                    axios.get('core.php?admin=gen_auth_code');
+                    that.auth();
+                },
+                get_service_stat: function() {
+                    that = this;
+                    axios.get('core.php?admin=get_service_stat')
+                        .then(function(res) {
+                            that.service_stat = res.data;
+                        });
+                },
+                switch_service_stat: function() {
+                    that = this;
+                    axios.get('core.php?admin=switch_stat')
+                        .then(function(res) {
+                            that.service_stat = res.data.stat;
+                        });
+                },
+                get_service_log: function() {
+                    that = this;
+                    axios.get('core.php?admin=get_service_log')
+                        .then(function(res) {
+                            that.service_log = res.data;
+                        });
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

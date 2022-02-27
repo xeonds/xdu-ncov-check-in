@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="assets/css/bootstrap.min.css" />
+    <title>XDU|Auto Check In</title>
+</head>
+
+<body>
+    <div class="container-fluid" style="padding:0;">
+        <div id="header" class="d-flex flex-row align-items-center justify-content-center bg-light w-100" style="padding:2rem;">
+            <h3>XDU<span class="text-primary">|</span>疫情通自动打卡</h3>
+        </div>
+        <!-- Nav tabs -->
+        <ul class="nav nav-pills justify-content-center" style="padding:1rem;">
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="pill" href="#acc-man" @click="flush_stat()">配置</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" data-toggle="pill" href="#show-log" @click="show_log()">日志</a>
+            </li>
+        </ul>
+        <div id="main" class="d-flex flex-column align-items-center tab-content" style="padding:2rem;min-height:60vh;">
+            <div class="tab-pane" id="acc-man" style="width:100%;max-width:768px;">
+                <h4 v-bind:class="{'text-success':stat==true&&id.length==11,'text-danger':stat==false&&id.length==11,'text-primary':id.length!=11||stat==2}">自动打卡{{id.length!=11||stat==2?'服务状态':stat?'已开启':'已关闭'}}</h4>
+                <div class="form-group">
+                    <label>统一身份认证账号</label>
+                    <input type="text" v-model="id" name="id" class="form-control" placeholder="输入账号以查询服务是否启用">
+                </div>
+                <div v-bind:style="{display:id.length==11&&stat!=2?'':'none'}" class="form-group">
+                    <label>密码</label>
+                    <input type="password" v-model="pw" name="pw" class="form-control" placeholder="提交密码以切换状态">
+                </div>
+                <button v-bind:style="{display:id.length==11&&stat!=2?'':'none'}" class="btn btn-primary" @click="switch_stat(id,pw)">切换</button>
+                <br /><br />
+                <h4 v-bind:style="{display:id.length==11&&stat!=2?'':'none'}">手动打卡</h4>
+                <button v-bind:style="{display:id.length==11&&stat!=2?'':'none'}" class="btn btn-primary" @click="check_in(id)">打！</button>
+                <br />
+                <p v-bind:style="{display:id.length==11&&stat!=2?'':'none'}" class="text-primary">{{result}}</p>
+                <p v-bind:style="{display:id.length==11&&stat!=2?'':'none'}" class="text-danger">仅供打卡失败情况使用，勿轻易点击！</p>
+                <h5>说明</h5>
+                <p class="text-primary">只有输入已注册的账号，页面才会出现服务状态等选项。</p>
+                <p class="text-primary">打卡完成后，请查看你的日志。确认成功后再离开；若仍不成功，请手动打卡。</p>
+            </div>
+            <div class="tab-pane active" id="show-log" style="width:100%;max-width:768px;">
+                <h4>查看日志</h4>
+                <div class="form-group">
+                    <label>统一身份认证账号</label>
+                    <input v-model="id" type="text" name="id" class="form-control">
+                </div>
+                <template v-for="data in log.slice().reverse()">
+                    <p><span class="text-primary">[{{ data.date }}]</span>{{ data.content }}</p>
+                </template>
+            </div>
+        </div>
+        <div id="footer" class="d-flex flex-column align-items-center justify-content-center bg-light" style="padding:2rem;">
+            <p>已运行：<span id="time_year"></span>年<span id="time_day"></span>日<span id="time_hour"></span>时<span id="time_minute"></span>分<span id="time_second"></span>秒</p>
+            <p><a href="#" data-toggle="modal" data-target="#about">关于</a> | <a href="#" data-toggle="modal" data-target="#register">注册</a> | <a href="#" data-toggle="modal" data-target="#delete">删除</a></p>
+            <p>&copy; 2021 <span class="text-primary">|</span> xeonds</p>
+        </div>
+    </div>
+    <div class="modal fade" id="about">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">关于</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <h4>关于项目</h4>
+                    <p>这是一个基于其他西电er的开源项目制作的晨午晚检打卡系统。</p>
+                    <p>原本只是我自己使用，后来发现我的同学也有这个需求，就干脆做成多人使用的打卡系统了。</p>
+                    <p>当然，本意肯定是为了方便，毕竟疫情期间学校里还是很安全的。只要不乱跑肯定不会有啥大问题。基于这个事实，电脑代打也不是不可以（）</p>
+                    <p>注册前请阅读用户协议。</p>
+                    <h4>关于作者</h4>
+                    <p>被隙间了。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="register">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">注册</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <form action="core.php?api=add_account" method="post">
+                    <div class="modal-body">
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <button type="button" class="close" data-dismiss="alert">&times;</button>
+                            <strong><h4>用户协议|Terms of service</h4></strong><br>
+                            <p>数据会保存在服务器以便自动打卡，如介意请勿使用</p>
+                            <p>如不想再使用，可以删除自己的账户</p>
+                            <p><strong>请遵守防疫规定，珍惜抗疫劳动成果，有异常请关闭自动打卡，并且务必及时上报！</strong></p>
+                        </div>
+                        <label>统一身份认证账号</label>
+                        <input type="text" name="id" class="form-control" placeholder="务必填对，填错了不怪我">
+                        <label>密码</label>
+                        <input type="text" name="pw" class="form-control" placeholder="闭眼.jpg">
+                        <label>授权码</label>
+                        <input type="text" name="auth_code" class="form-control" placeholder="找作者，问ta要">
+                    </div>
+                    <div class="modal-footer ">
+                        <button type="submit " class="btn btn-primary ">注册</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade " id="delete ">
+
+        <div class="modal-dialog ">
+
+            <div class="modal-content ">
+                <div class="modal-header ">
+                    <h4 class="modal-title ">删除账户</h4>
+                    <button type="button " class="close " data-dismiss="modal ">&times;</button>
+                </div>
+                <div class="modal-body ">
+                    <form action="core.php?api=del_account " method="post ">
+                        <label>统一身份认证账号</label>
+                        <input type="text " name="id " class="form-control ">
+                </div>
+                <div class="modal-footer ">
+                    <button class="btn btn-danger ">删除</button>
+                </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="assets/js/run_time.js "></script>
+    <script src="assets/js/jquery.min.js "></script>
+    <script src="assets/js/axios.min.js "></script>
+    <script src="assets/js/bootstrap.js "></script>
+    <script src="assets/js/vue.js "></script>
+    <script>
+        site_run_time(2021, 11, 3, 0, 0, 0);
+        new Vue({
+            el: "#main ",
+            data: {
+                id: '',
+                pw: '',
+                log: [],
+                result: '',
+                stat: false
+            },
+            created: function() {
+                that = this;
+                window.setInterval(function() {
+                    that.show_log();
+                }, 1000);
+            },
+            watch: {
+                id: ['flush_stat', 'show_log']
+            },
+            methods: {
+                show_log: function() {
+                    that = this;
+                    let data = new FormData();
+
+                    data.append('id', that.id);
+                    axios.post('core.php?api=show_log', data)
+                        .then(function(res) {
+                            if (res.data != null)
+                                that.log = res.data;
+                            else
+                                that.log = [{
+                                    'date': '错误',
+                                    'content': '无数据'
+                                }];
+                        });
+                },
+                switch_stat: function(id, pw) {
+                    that = this;
+                    let data = new FormData();
+
+                    data.append('id', id);
+                    data.append('pw', pw);
+                    axios.post('core.php?api=switch_stat', data)
+                        .then(function(res) {
+                            if (res.data.data == true || res.data.data == false)
+                                that.stat = res.data.data;
+                        });
+                },
+                flush_stat: function() {
+                    that = this;
+                    let data = new FormData();
+
+                    if (that.id.length == 11) {
+                        data.append('id', that.id);
+                        axios.post('core.php?api=stat_get', data).then(function(res) {
+                            that.stat = res.data.data;
+                        });
+                    }
+                },
+                check_in: function(id) {
+                    that = this;
+                    let data = new FormData();
+                    if (id.length == 11) {
+                        data.append('id', id);
+                        axios.post('core.php?api=check_in', data).then(function(res) {
+                            that.result = res.data.content;
+                        });
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
